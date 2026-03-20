@@ -10,6 +10,9 @@ pipeline {
         DOCKERHUB_USER = "9397054542"
         DOCKER_CREDS = "dockerCred"
         CONTAINER_PORT = "80"
+        AWS_REGION = "ap-south-1"
+        EKS_CLUSTER = "mycluster"
+        KUBECONFIG = "/var/lib/jenkins/.kube/config"
     }
 
     stages {
