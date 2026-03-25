@@ -1,7 +1,6 @@
 pipeline {
 agent any
 
-```
 environment {
     WORK_DIR = "/var/lib/jenkins/workspace/Game"
     IMAGE_NAME = "indie-gems"
@@ -28,12 +27,12 @@ stages {
         post {
             success {
                 emailext subject: "Checkout SUCCESS - Build ${BUILD_NUMBER}",
-                         body: "Code checkout completed successfully.",
+                         body: "Code checkout completed successfully.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
             failure {
                 emailext subject: "Checkout FAILED - Build ${BUILD_NUMBER}",
-                         body: "Checkout stage failed.",
+                         body: "Checkout stage failed.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
         }
@@ -51,12 +50,38 @@ stages {
         post {
             success {
                 emailext subject: "Docker Build SUCCESS - Build ${BUILD_NUMBER}",
-                         body: "Docker image built successfully.",
+                         body: "Docker image built successfully.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
             failure {
                 emailext subject: "Docker Build FAILED - Build ${BUILD_NUMBER}",
-                         body: "Docker build failed.",
+                         body: "Docker build failed.\n${BUILD_URL}",
+                         to: "${EMAIL_TO}"
+            }
+        }
+    }
+
+    stage('DockerHub Login') {
+        steps {
+            withCredentials([usernamePassword(
+                credentialsId: "${DOCKER_CREDS}",
+                usernameVariable: 'DOCKER_USER',
+                passwordVariable: 'DOCKER_PASS'
+            )]) {
+                sh """
+                    echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                """
+            }
+        }
+        post {
+            success {
+                emailext subject: "Docker Login SUCCESS - Build ${BUILD_NUMBER}",
+                         body: "DockerHub login successful.\n${BUILD_URL}",
+                         to: "${EMAIL_TO}"
+            }
+            failure {
+                emailext subject: "Docker Login FAILED - Build ${BUILD_NUMBER}",
+                         body: "DockerHub login failed.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
         }
@@ -69,12 +94,12 @@ stages {
         post {
             success {
                 emailext subject: "Docker Push SUCCESS - Build ${BUILD_NUMBER}",
-                         body: "Image pushed to DockerHub.",
+                         body: "Image pushed to DockerHub.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
             failure {
                 emailext subject: "Docker Push FAILED - Build ${BUILD_NUMBER}",
-                         body: "Docker push failed.",
+                         body: "Docker push failed.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
         }
@@ -83,19 +108,19 @@ stages {
     stage('Deploy to Kubernetes') {
         steps {
             sh '''
-            kubectl apply -f k8s/deployment.yml
-            kubectl apply -f k8s/service.yml
+                kubectl apply -f k8s/deployment.yml
+                kubectl apply -f k8s/service.yml
             '''
         }
         post {
             success {
                 emailext subject: "Deployment SUCCESS - Build ${BUILD_NUMBER}",
-                         body: "Kubernetes deployment successful.",
+                         body: "Kubernetes deployment successful.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
             failure {
                 emailext subject: "Deployment FAILED - Build ${BUILD_NUMBER}",
-                         body: "Deployment failed.",
+                         body: "Deployment failed.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
         }
@@ -104,20 +129,20 @@ stages {
     stage('Verify Deployment') {
         steps {
             sh '''
-            kubectl rollout status deployment python-devops-app || true
-            kubectl get pods -o wide
-            kubectl get svc
+                kubectl rollout status deployment python-devops-app || true
+                kubectl get pods -o wide
+                kubectl get svc
             '''
         }
         post {
             success {
                 emailext subject: "Verification SUCCESS - Build ${BUILD_NUMBER}",
-                         body: "Deployment verified successfully.",
+                         body: "Deployment verified successfully.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
             failure {
                 emailext subject: "Verification FAILED - Build ${BUILD_NUMBER}",
-                         body: "Verification failed.",
+                         body: "Verification failed.\n${BUILD_URL}",
                          to: "${EMAIL_TO}"
             }
         }
@@ -127,10 +152,9 @@ stages {
 post {
     always {
         emailext subject: "Pipeline Completed - Build ${BUILD_NUMBER}",
-                 body: "Pipeline execution finished. Check Jenkins for details.",
+                 body: "Pipeline execution finished.\n${BUILD_URL}",
                  to: "${EMAIL_TO}"
     }
 }
-```
 
 }
