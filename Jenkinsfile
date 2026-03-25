@@ -151,9 +151,9 @@ stages {
 
 post {
     always {
-        emailext subject: "Pipeline Completed - Build ${BUILD_NUMBER}",
-                 body: "Pipeline execution finished.\n${BUILD_URL}",
-                 to: "${EMAIL_TO}"
+        emailext subject: "Stage Complete - Build ${BUILD_NUMBER}",
+                 body: "Stage completed (success or fail).\n${BUILD_URL}",
+                 to: "${env.EMAIL_TO}"
     }
 }
 
