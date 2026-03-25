@@ -1,95 +1,136 @@
 pipeline {
-    agent any
+agent any
 
-    environment {
-        WORK_DIR = "/var/lib/jenkins/workspace/Game"
-        IMAGE_NAME = "indie-gems"
-        IMAGE_TAG = "${BUILD_NUMBER}"
-        CONTAINER_NAME = "indie-gems-container"
-        PORT = "9676"
-        DOCKERHUB_USER = "kalyansagar5"
-        DOCKER_CREDS = "docker_cred"
-        CONTAINER_PORT = "80"
-        AWS_REGION = "us-east-1"
-        EKS_CLUSTER = "mycluster"
-        KUBECONFIG = "/var/lib/jenkins/.kube/config"
-    }
+```
+environment {
+    WORK_DIR = "/var/lib/jenkins/workspace/Game"
+    IMAGE_NAME = "indie-gems"
+    IMAGE_TAG = "${BUILD_NUMBER}"
+    CONTAINER_NAME = "indie-gems-container"
+    PORT = "9676"
+    DOCKERHUB_USER = "kalyansagar5"
+    DOCKER_CREDS = "docker_cred"
+    CONTAINER_PORT = "80"
+    AWS_REGION = "us-east-1"
+    EKS_CLUSTER = "mycluster"
+    KUBECONFIG = "/var/lib/jenkins/.kube/config"
+    EMAIL_TO = "ravee2288@gmail.com"
+}
 
-    stages {
-        stage('Checkout Code') {
-            steps {
-                dir("${WORK_DIR}") {
-                    git branch: 'main', url: 'https://github.com/kalyansagar5/Indie_Gems_Portal.git'
-                }
+stages {
+
+    stage('Checkout Code') {
+        steps {
+            dir("${WORK_DIR}") {
+                git branch: 'main', url: 'https://github.com/kalyansagar5/Indie_Gems_Portal.git'
             }
         }
-
-        stage('Build Docker Image') {
-            steps {
-                dir("${WORK_DIR}") {
-                    sh '''
-                        docker rmi -f ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG} || true
-                        docker build -t ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG} .
-                    '''
-                }
+        post {
+            success {
+                emailext subject: "Checkout SUCCESS - Build ${BUILD_NUMBER}",
+                         body: "Code checkout completed successfully.",
+                         to: "${EMAIL_TO}"
             }
-        }
-
-        stage('DockerHub Login') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: "${DOCKER_CREDS}",
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                        echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
-                    """
-                }
-            }
-        }
-
-        stage('Push Image to DockerHub') {
-            steps {
-                sh "docker push ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}"
-            }
-        }
-
-        stage('Update K8s Image') {
-            steps {
-                sh '''
-                sed -i "s|image:.*|image: $DOCKERHUB_USER/$IMAGE_NAME:$IMAGE_TAG|" k8s/deployment.yml
-                '''
-            }
-        }
-
-        stage('Configure EKS Access') {
-            steps {
-                sh '''
-                export PATH=$PATH:/usr/local/bin
-                aws eks --region $AWS_REGION update-kubeconfig --name $EKS_CLUSTER
-                /usr/local/bin/kubectl config current-context
-                '''
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh '''
-                kubectl apply -f k8s/deployment.yml
-                kubectl apply -f k8s/service.yml
-                '''
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                sh '''
-                kubectl rollout status deployment python-devops-app || true
-                kubectl get pods -o wide
-                kubectl get svc
-                '''
+            failure {
+                emailext subject: "Checkout FAILED - Build ${BUILD_NUMBER}",
+                         body: "Checkout stage failed.",
+                         to: "${EMAIL_TO}"
             }
         }
     }
+
+    stage('Build Docker Image') {
+        steps {
+            dir("${WORK_DIR}") {
+                sh '''
+                    docker rmi -f ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG} || true
+                    docker build -t ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG} .
+                '''
+            }
+        }
+        post {
+            success {
+                emailext subject: "Docker Build SUCCESS - Build ${BUILD_NUMBER}",
+                         body: "Docker image built successfully.",
+                         to: "${EMAIL_TO}"
+            }
+            failure {
+                emailext subject: "Docker Build FAILED - Build ${BUILD_NUMBER}",
+                         body: "Docker build failed.",
+                         to: "${EMAIL_TO}"
+            }
+        }
+    }
+
+    stage('Push Image to DockerHub') {
+        steps {
+            sh "docker push ${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}"
+        }
+        post {
+            success {
+                emailext subject: "Docker Push SUCCESS - Build ${BUILD_NUMBER}",
+                         body: "Image pushed to DockerHub.",
+                         to: "${EMAIL_TO}"
+            }
+            failure {
+                emailext subject: "Docker Push FAILED - Build ${BUILD_NUMBER}",
+                         body: "Docker push failed.",
+                         to: "${EMAIL_TO}"
+            }
+        }
+    }
+
+    stage('Deploy to Kubernetes') {
+        steps {
+            sh '''
+            kubectl apply -f k8s/deployment.yml
+            kubectl apply -f k8s/service.yml
+            '''
+        }
+        post {
+            success {
+                emailext subject: "Deployment SUCCESS - Build ${BUILD_NUMBER}",
+                         body: "Kubernetes deployment successful.",
+                         to: "${EMAIL_TO}"
+            }
+            failure {
+                emailext subject: "Deployment FAILED - Build ${BUILD_NUMBER}",
+                         body: "Deployment failed.",
+                         to: "${EMAIL_TO}"
+            }
+        }
+    }
+
+    stage('Verify Deployment') {
+        steps {
+            sh '''
+            kubectl rollout status deployment python-devops-app || true
+            kubectl get pods -o wide
+            kubectl get svc
+            '''
+        }
+        post {
+            success {
+                emailext subject: "Verification SUCCESS - Build ${BUILD_NUMBER}",
+                         body: "Deployment verified successfully.",
+                         to: "${EMAIL_TO}"
+            }
+            failure {
+                emailext subject: "Verification FAILED - Build ${BUILD_NUMBER}",
+                         body: "Verification failed.",
+                         to: "${EMAIL_TO}"
+            }
+        }
+    }
+}
+
+post {
+    always {
+        emailext subject: "Pipeline Completed - Build ${BUILD_NUMBER}",
+                 body: "Pipeline execution finished. Check Jenkins for details.",
+                 to: "${EMAIL_TO}"
+    }
+}
+```
+
 }
